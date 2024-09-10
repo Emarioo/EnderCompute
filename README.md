@@ -19,8 +19,8 @@ Most directories are self explanatory (tests, examples, docs).
 
 `src` is code for the backend and command line tool.
 
-# Background
-Where does the name from?
+# Questions
+**What's up with the name?**
 - **Ender** - The End in Minecraft, a void far away, can't be reached my normal means
 - **Compute** - Computation, processing
-- **Ender Compute** - Computation on a server somewhere
+- **Ender Compute** - Computation on a server endlessly running somewhere
