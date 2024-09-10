@@ -1,0 +1,13 @@
+/*
+    Entry point of the application
+*/
+
+#import "Logger"
+
+#import "webserver"
+
+fn main() {
+    log("Hello world!")
+    
+    start_webserver()
+}

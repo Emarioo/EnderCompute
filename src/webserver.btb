@@ -1,0 +1,133 @@
+
+#import "Net"
+#import "Logger"
+#import "OS"
+#import "Threads"
+
+fn start_webserver() {
+    port: i32 = 8080
+    
+    server: Server
+    server.set_callback(handle_event, &server)
+    err := server.start(port)
+    log("Started server at port ",port)
+    
+    fn handle_event(e: Event, user_data: void*) {
+        server := cast<Server*>user_data
+        if e.type == EVENT_RECEIVE {
+            // log("Event recv:")
+            // log(e.bytes)
+            //#################
+            //  PARSE HEADER
+            // ################
+            msg := e.bytes
+            
+            head := 0
+            if substring(msg,0,4) != "GET " {
+                log("missing GET")
+                return;
+            }
+            head += 4
+            
+            path_start := head
+            while {
+                chr := msg[head]
+                head++
+                if chr == ' ' || chr == '\n' || chr == '\r' || chr == '\t'
+                    break
+            }
+            
+            path: StringBuilder
+            defer path.cleanup()
+            path.append(substring(msg,path_start,head-1))
+            
+            version := "HTTP/1.1\r\n"
+            if substring(msg,head,head + version.len) != version {
+                log("missing HTTP/1.1, or path was bad '",path,"'")
+                return;
+            }
+            
+            log("get ",path)
+            
+            // ##########
+            //  RESPOND
+            // ##########
+            
+            if !IsPathSanitized(path) {
+                // log("path is not safe")
+                return;   
+            }
+            
+            real_path: StringBuilder
+            defer real_path.cleanup()
+            real_path.append("public")
+            if(path[0] == '/') {
+                if path == "/" {
+                    real_path.append("/index.html")
+                } else {
+                    real_path.append(path)
+                }
+            } else {
+                return; // suspicious, path in header always begins with slash
+            }
+            
+            response: StringBuilder
+            defer response.cleanup()
+            
+            filesize: i64
+            file := FileOpen(real_path, FILE_READ_ONLY, &filesize)
+            if !file {
+                response.append("HTTP/1.1 404 Not Found\r\n")
+                response.append("Connection: close\r\n")
+                response.append("\r\n")
+                // log("send: Not Found")
+            } else {
+                defer FileClose(file)
+                
+                response.append("HTTP/1.1 200 OK\r\n")
+                response.append("Content-Length: ")
+                response.append(filesize)
+                response.append("\r\n")
+                response.append("Connection: close\r\n")
+                response.append("\r\n")
+                
+                header_len := response.len
+                response.resize(header_len + filesize)
+                
+                err := FileRead(file, response.ptr + header_len, filesize)
+                if !err {
+                    log("FileRead failed on ", real_path)
+                    // TODO: Send back error
+                    return;
+                }
+                // log("send: ",real_path)
+            }
+            
+            server.send<char>(response.sliced(), who = e.who)
+        }
+    }
+    
+    server.wait()
+    server.close()
+}
+
+fn IsPathSanitized(path: StringBuilder) -> bool {
+    // Crude sanitization
+    if path.ptr[0] != '/'
+       return false
+    for 1..path.len {
+        chr := path[nr]
+        if path.ptr[nr-1] == '.' && chr == '.'
+            return false
+        if chr >= '0' && chr <= '9'
+            continue
+        if chr >= 'A' && chr <= 'Z'
+            continue
+        if chr >= 'a' && chr <= 'z'
+            continue
+        if chr == '_' || chr == '-' || chr == '-' || chr == '.'
+            continue
+        return false
+    }
+    return true
+}

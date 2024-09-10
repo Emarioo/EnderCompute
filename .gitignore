@@ -2,3 +2,8 @@ bin
 
 *.o
 *.exe
+
+# ignores btb-win_x64 which contains the BTB compiler
+# eventually btb will be installed globally but since it's work in progress
+# i'll keep a copy of btb in the local repo
+btb-*
