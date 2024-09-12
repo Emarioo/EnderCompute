@@ -6,8 +6,7 @@
 
 #import "webserver"
 
-fn main() {
-    log("Hello world!")
-    
+fn main() -> i32 {
     start_webserver()
+    return 0
 }

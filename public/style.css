@@ -1,0 +1,117 @@
+* {
+    margin: 0px;
+    padding: 0px;
+    box-sizing: border-box;
+    
+    font-family: monospace;
+}
+
+body {
+    display: flex;
+    flex-flow: column;
+    height: 100%;
+    
+    text-align: center;
+    
+    background-color: rgb(76, 207, 216);
+}
+
+.content {
+    display: flex;
+    position: relative;
+    flex-grow: 1;
+}
+
+.sidebar {
+    min-width: 10%;
+    max-width: 20%;
+    /* width: 10%; */
+    height: auto;
+    padding: 1em;
+    /* height: auto; */
+    
+    background-color: coral;
+}
+input {
+    
+}
+.sidebar button {
+    border-radius: 3px;
+    padding: 3px;
+    border: none;
+    font-size: 1.5em;
+    color: rgb(255, 255, 255);
+    background-color: rgb(40, 218, 93);
+    text-decoration: none;
+    cursor: pointer;
+}
+.sidebar button:hover {
+    transition: background-color 0.17s ease-in-out;
+    background-color: rgb(119, 216, 135);
+}
+.sidebar button.selected {
+    transition: background-color 0.17s ease-in-out;
+    background-color: rgb(67, 206, 206);
+    /* color: white; */
+}
+.joblist {
+    
+    /* background-color:crimson; */
+}
+.joblist li {
+    font-size: 1.2em;
+    list-style-type: none;
+    padding: 0.2em;
+    margin: 0.4em;
+    background-color: burlywood;
+    cursor: pointer;
+}
+.joblist li:hover {
+    transition: background-color 0.17s ease-in-out;
+    background-color: rgb(255, 231, 202);
+}
+.joblist li.selected {
+    transition: background-color 0.17s ease-in-out;
+    background-color: rgb(95, 95, 194);
+}
+
+.jobinfo_back {
+    min-width: 40%;
+    position: relative;
+    height: 100%;
+    flex-grow: 1;
+    /* padding: 1em; */
+    display: flex;
+    text-align: center;
+    background-color: rgb(70, 113, 255);
+}
+.hint_text {
+    height: 1em;
+    color: wheat;
+    text-align: center;
+    margin: auto;
+    padding: 1em
+}
+
+.jobinfo {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    
+    padding: 1em;
+    
+    /* margin: 1em; */
+    text-align: left;
+    background-color: aquamarine;
+}
+.createinfo {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    
+    padding: 1em;
+    
+    /* margin: 1em; */
+    text-align: left;
+    background-color: aquamarine;
+}

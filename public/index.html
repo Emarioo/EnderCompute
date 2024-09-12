@@ -1,0 +1,119 @@
+<html>
+    <head>
+        <title>Ender Compute</title>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <h1 style="font-family: 'Courier New', Courier, monospace;">Welcome to the <span style="font-weight: bold;">Ender Compute</span> interface</h1>
+        
+        <div class="content">
+            <div class="sidebar" onclick="deselect_all()">
+                <h2>Jobs</h2>
+                <button onclick="create_job(this)">Create</button>
+                <!-- You can deselect a job by clicking the joblist background -->
+                <ul class="joblist">
+                    <!-- TODO: add progress bar and icon indicating status -->
+                    <li onclick="click_job(this)">Job 1</li>
+                    <li onclick="click_job(this)">Job with long name</li>
+                </ul>
+            </div>
+            <div class="jobinfo_back">
+                <h2 class="hint_text">Click on a job for it's information and actions</h2>
+                <!-- <div class="jobinfo""> -->
+                <div hidden class="jobinfo"">
+                    <h2>Job title</h2>
+                    <div class="jobdesc">
+                        <h3>Status info</h3>
+                        <p>Scheduled at:</p>
+                        <p>Started at:</p>
+                        <p>Finished at:</p>
+                        <p>Running time:</p>
+                        <p>Job type/script + arguments</p>
+                        <p>Which tests ran, what was built?</p>
+                        <p>(description)</p>
+                    </div>
+                    <div class="joboutput">
+                    <h3>Output</h3>
+                        <span>
+                            A lot of text from stdout, stderr what has been run and stuff.
+                        </span>
+                    </div>
+                </div>
+                <div hidden class="createinfo">
+                    <h2>Create new job</h2>
+                    <span>Job name:</span><input placeholder="job_0"></input> <br>
+                    <span>Script to run:</span><input placeholder="btb --test"></input> <br>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            // setInterval(()=>{
+            //     window.location.href = window.location.href
+            // }, 2000)
+            
+            var current_job_element = null;
+            var suspend_deselect = false;
+            
+            // Interactive features:
+            function create_job(element) {
+                deselect_all()
+                
+                if(element) {
+                    element.classList.add("selected")
+                }
+                current_job_element = element
+                
+                update_createinfo(element)
+                
+                suspend_deselect = true
+            }
+            function deselect_all() {
+                if (suspend_deselect) { // prevent onclick on parent and child elements from firing, only the child will be fired.
+                    suspend_deselect = false
+                    return;
+                }
+                if (current_job_element) {
+                    current_job_element.classList.remove("selected")
+                }
+                current_job_element = null;
+                update_jobinfo(null)
+                
+                update_createinfo(null)
+            }
+            function click_job(element) {
+                // console.log("click",element)
+                // unhighlight previus element
+                // highlight element
+                // update jobinfo
+                deselect_all()
+                if(element) {
+                    element.classList.add("selected")
+                }
+                current_job_element = element
+                update_jobinfo(element)
+                
+                suspend_deselect = true
+            }
+            function update_jobinfo(element) {
+                let jobinfo = document.getElementsByClassName("jobinfo")[0]
+                
+                if (element) {
+                    jobinfo.hidden = false;
+                } else {
+                    jobinfo.hidden = true;
+                }
+            }
+            function update_createinfo(element) {
+                let createinfo = document.getElementsByClassName("createinfo")[0]
+                
+                if (element) {
+                    createinfo.hidden = false;
+                } else {
+                    createinfo.hidden = true;
+                }
+            }
+        </script>
+    </body>
+</html>
