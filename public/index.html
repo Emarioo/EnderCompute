@@ -10,7 +10,7 @@
         <div class="content">
             <div class="sidebar" onclick="deselect_all()">
                 <h2>Jobs</h2>
-                <button onclick="create_job(this)">Create</button>
+                <button onclick="show_create_job(this)">Create</button>
                 <!-- You can deselect a job by clicking the joblist background -->
                 <ul class="joblist">
                     <!-- TODO: add progress bar and icon indicating status -->
@@ -44,6 +44,8 @@
                     <h2>Create new job</h2>
                     <span>Job name:</span><input placeholder="job_0"></input> <br>
                     <span>Script to run:</span><input placeholder="btb --test"></input> <br>
+                    
+                    <button onclick="click_create_job(this)"></button>
                 </div>
             </div>
         </div>
@@ -56,8 +58,37 @@
             var current_job_element = null;
             var suspend_deselect = false;
             
+            // https://stackoverflow.com/questions/494143/creating-a-new-dom-element-from-an-html-string-using-built-in-dom-methods-or-pro
+            function htmlToNode(html) {
+                const template = document.createElement('template');
+                template.innerHTML = html;
+                return template.content.firstChild;
+            }
+            
+            update_joblist()
+            function update_joblist() {
+                fetch("api/list").then((res)=> res.json()).then((data) => {
+                    // console.log(data)
+                    let joblist = document.getElementsByClassName("joblist")[0]
+                    while(joblist.children.length>0) {
+                        joblist.removeChild(joblist.children[joblist.children.length-1])
+                    }
+                    // console.log("removed children", joblist.children)
+                    let obj = data
+                    for(let i=0;i<obj.jobs.length;i++) {
+                        let job = obj.jobs[i]
+                        
+                        let text = "<li onclick=\"click_job(this, "+job.id+")\">" + job.name + "</li>"
+                        let node = htmlToNode(text)
+                        // console.log(node)
+                        joblist.append(node)
+                    }
+                    // console.log("new children", joblist.children.length)
+                })
+            }
+            
             // Interactive features:
-            function create_job(element) {
+            function show_create_job(element) {
                 deselect_all()
                 
                 if(element) {
@@ -82,7 +113,7 @@
                 
                 update_createinfo(null)
             }
-            function click_job(element) {
+            function click_job(element, id) {
                 // console.log("click",element)
                 // unhighlight previus element
                 // highlight element
@@ -92,19 +123,19 @@
                     element.classList.add("selected")
                 }
                 current_job_element = element
-                update_jobinfo(element)
+                update_jobinfo(element, id)
                 
                 suspend_deselect = true
-
-                fetch("get?id=1").then((res)=>{
-                    console.log(res)
-                })
             }
-            function update_jobinfo(element) {
+            function update_jobinfo(element, id) {
                 let jobinfo = document.getElementsByClassName("jobinfo")[0]
                 
                 if (element) {
                     jobinfo.hidden = false;
+                    
+                    fetch("api/get?id=" + id).then((res)=> res.json()).then((data) => {
+                        console.log(data)
+                    })
                 } else {
                     jobinfo.hidden = true;
                 }
@@ -117,6 +148,23 @@
                 } else {
                     createinfo.hidden = true;
                 }
+            }
+            function click_create_job(element) {
+                let createinfo = document.getElementsByClassName("createinfo")[0]
+                
+                let inputs = createinfo.getElementsByTagName("input")
+                
+                let data = "name=" + inputs[0].value + "\n"
+                         + "desc=" + inputs[1].value + "\n"
+                
+                fetch("api/create", {
+                    method: 'POST',
+                    // headers: {
+                        // 'Accept': 'application/json',
+                        // 'Content-Type': 'application/json'
+                    // },
+                    body: data
+                })
             }
         </script>
     </body>

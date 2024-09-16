@@ -21,7 +21,7 @@
 enum Timestamp : u64 {
     TIME_ZERO,
 }
-enum OutputHandle : i64 {
+enum OutputHandle : i32 {
     HANDLE_ZERO,
 }
 #macro JOB_STATIC_SIZE 40 // 3 * 8 + 2*4

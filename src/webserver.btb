@@ -3,17 +3,27 @@
 #import "Logger"
 #import "OS"
 #import "Threads"
+#import "backend"
+
+struct Session {
+    server: Server;
+    job_system: JobSystem*;
+}
 
 fn start_webserver() {
     port: i32 = 8080
     
-    server: Server
-    server.set_callback(handle_event, &server)
-    err := server.start(port)
+    session: Session;
+    session.job_system = InitJobSystem("data")
+    
+    session.server.set_callback(handle_event, &session)
+    err := session.server.start(port)
+    
     log("Started server at port ",port)
     
     fn handle_event(e: Event, user_data: void*) {
-        server := cast<Server*>user_data
+        session := cast<Session*>user_data
+        server := &session.server
         if e.type == EVENT_RECEIVE {
             // log("Event recv:")
             // log(e.bytes)
@@ -23,14 +33,18 @@ fn start_webserver() {
             msg := e.bytes
             
             head := 0
-            if substring(msg,0,4) != "GET " {
-                log("missing GET")
+            
+            if substring(msg,0,4) == "GET " {
+                head += 4
+            } else substring(msg,0,5) == "POST " {
+                head += 5
+            } else {
+                log("missing GET or POST")
                 return;
             }
-            head += 4
             
             path_start := head
-            while {
+            while head < msg.len {
                 chr := msg[head]
                 head++
                 if chr == ' ' || chr == '\n' || chr == '\r' || chr == '\t'
@@ -46,26 +60,68 @@ fn start_webserver() {
                 log("missing HTTP/1.1, or path was bad '",url,"'")
                 return;
             }
+            head += version.len
+            
+            fields: Array<char[]>
+            defer fields.cleanup
+            field_start := 0
+            while {
+                chr := msg[head]
+                chr2: char
+                if head+1 < msg.len
+                    chr2 = msg[head+1]
+                head++
+                
+                if chr == '\r' && chr2 == '\n' {
+                    if field_start + 1 == head // reached final newline
+                        break
+                    
+                    fields.add(substring(msg, field_start, head))
+                    
+                    head++
+                    field_start = head
+                }
+            }
+            content_length: i32
+            content_data: char* = msg + head;
+            for fields.sliced() {
+                pair := split(":", it)
+                defer pair.cleanup()
+                
+                if pair.size() != 2
+                    continue
+                key := pair.get(0)
+                val := pair.get(1)
+                if key == "Content-Length" {
+                    value_str := substring(val, 1)
+                    content_length = parse_i64(value_str)
+                }
+            }
             
             // log("get ",path)
 
             // calculate options
             index := find("?", url)
-            log(url, " ", index)
+            // log(url, " ", index)
 
             option_part := substring(url, index + 1)
             
             options_str := split("&", option_part)
-            for @ptr options_str.sliced() {
-                pair := split("=", options_str.sliced())
+            option_id: char[] = {}
+            for options_str.sliced() {
+                pair := split("=", it)
+                defer pair.cleanup()
                 if pair.len != 2
                     continue
                 if pair[0] == "id" {
-                    log("id=",pair[1])
+                    option_id = pair[1]
+                    // log("id=",pair[1])
                 }
             }
 
             path := substring(url, 0, index)
+            
+            // log(url, " ",path)
             
             // ##########
             //  RESPOND
@@ -74,6 +130,126 @@ fn start_webserver() {
             if !IsPathSanitized(path) {
                 // log("path is not safe")
                 return;   
+            }
+            
+            if path == "/api/create" {
+                
+                content: char[] = {content_data, content_length}
+                
+                fields_loop := split("\n", content)
+                defer fields.cleanup()
+                name: char[]
+                desc: char[]
+                for fields.sliced() {
+                    
+                }
+                
+                session.job_system.create_job(name, desc)
+                
+                response: StringBuilder
+                defer response.cleanup()
+                
+                response.append("HTTP/1.1 200 OK\r\n")
+                response.append("Content-Length: 0\r\n")
+                response.append("Connection: close\r\n")
+                response.append("\r\n")
+            } else if path == "/api/get" {
+                // TODO: check if parse failed
+                id: i32 = parse_i64(option_id)
+                
+                job := session.job_system.find_job(id)
+                
+                response: StringBuilder
+                defer response.cleanup()
+                
+                if !job {
+                    response.append("HTTP/1.1 404 Not Found\r\n")
+                    response.append("Connection: close\r\n")
+                    response.append("\r\n")
+                        
+                    server.send<char>(response.sliced(), who = e.who)
+                    return;
+                }
+                
+                data: StringBuilder
+                defer data.cleanup()
+                
+                data.append("{")
+                
+                #macro FIELD(K,V)
+                data.append("\"")
+                data.append(K)
+                data.append("\":")
+                data.append(V)
+                data.append(",")
+                #endmacro
+                #macro FIELD_S(K,V)
+                data.append("\"")
+                data.append(K)
+                data.append("\":")
+                data.append("\"")
+                data.append(V)
+                data.append("\"")
+                data.append(",")
+                #endmacro
+                
+                FIELD_S("name", job.name)
+                FIELD("id", job.id)
+                FIELD_S("description", job.description)
+                FIELD("created",  cast<i64>job.created)
+                FIELD("started",  cast<i64>job.started)
+                FIELD("finished", cast<i64>job.finished)
+                FIELD("output_handle", cast<i32>job.output_handle)
+                
+                data.append("}")
+                
+                response.append("HTTP/1.1 200 OK\r\n")
+                response.append("Content-Length: ")
+                response.append(data.size())
+                response.append("\r\n")
+                response.append("Connection: close\r\n")
+                response.append("\r\n")
+                
+                response.append(data)
+                
+                server.send<char>(response.sliced(), who = e.who)
+                return;
+            } else  if path == "/api/list" {
+                data: StringBuilder
+                defer data.cleanup()
+                
+                data.append("{")
+                data.append("\"jobs\":[")
+                
+                for @ptr session.job_system.jobs.sliced() {
+                    if nr != 0
+                        data.append(",")
+                    
+                    data.append("{")
+                    data.append("\"id\":")
+                    data.append(it.id)
+                    data.append(",")
+                    data.append("\"name\":")
+                    data.append("\"")
+                    data.append(it.name)
+                    data.append("\"")
+                    data.append("}")
+                }
+                
+                data.append("]}")
+                
+                response: StringBuilder
+                response.append("HTTP/1.1 200 OK\r\n")
+                response.append("Content-Length: ")
+                response.append(data.size())
+                response.append("\r\n")
+                response.append("Connection: close\r\n")
+                response.append("\r\n")
+                
+                response.append(data)
+                
+                server.send<char>(response.sliced(), who = e.who)
+                return;
             }
             
             real_path: StringBuilder
@@ -125,11 +301,11 @@ fn start_webserver() {
         }
     }
     
-    server.wait()
-    server.close()
+    session.server.wait()
+    session.server.close()
 }
 
-fn IsPathSanitized(path: StringBuilder) -> bool {
+fn IsPathSanitized(path: char[]) -> bool {
     // Crude sanitization
     if path.ptr[0] != '/'
        return false
@@ -143,7 +319,7 @@ fn IsPathSanitized(path: StringBuilder) -> bool {
             continue
         if chr >= 'a' && chr <= 'z'
             continue
-        if chr == '_' || chr == '-' || chr == '-' || chr == '.'
+        if chr == '_' || chr == '-' || chr == '-' || chr == '.' || chr == '/'
             continue
         return false
     }
