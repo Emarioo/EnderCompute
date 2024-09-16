@@ -1,10 +1,33 @@
 **Ender Compute** is a project about running long-running processes such as tests in the background.
 
+Current web interface (work in progress)
+![](./docs/img/prototype-0.PNG)
+
 It is inspired by Jenkins.
 
-
 # The project
-The code is compiled using BetterThanBatch. You can download a release instead of compiling the project from scratch.
+The code is written in BetterThanBatch (https://github.com/Emarioo/BetterThanBatch).
+
+## Getting started
+Download a release from github (https://github.com/Emarioo/EnderCompute/releases).
+Or build it yourself.
+
+Then run the executablein a terminal from the folder you downloaded. A web server will start
+and tell you which port to connect to.
+
+```
+endercompute --port 8080
+endercompute --rootdir D:/endercompute/test
+```
+
+The executable will store information that should persist in the rootdir you specify, the current directory is the default.
+
+## Building
+```
+btb src/main
+```
+
+Yes, that's it. Now you know why I chose BetterThanBatch.
 
 ## Products and software
 The project develops two software products.

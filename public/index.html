@@ -95,6 +95,10 @@
                 update_jobinfo(element)
                 
                 suspend_deselect = true
+
+                fetch("get?id=1").then((res)=>{
+                    console.log(res)
+                })
             }
             function update_jobinfo(element) {
                 let jobinfo = document.getElementsByClassName("jobinfo")[0]

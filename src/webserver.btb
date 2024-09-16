@@ -37,17 +37,35 @@ fn start_webserver() {
                     break
             }
             
-            path: StringBuilder
-            defer path.cleanup()
-            path.append(substring(msg,path_start,head-1))
+            url: StringBuilder
+            defer url.cleanup()
+            url.append(substring(msg,path_start,head-1))
             
             version := "HTTP/1.1\r\n"
             if substring(msg,head,head + version.len) != version {
-                log("missing HTTP/1.1, or path was bad '",path,"'")
+                log("missing HTTP/1.1, or path was bad '",url,"'")
                 return;
             }
             
             // log("get ",path)
+
+            // calculate options
+            index := find("?", url)
+            log(url, " ", index)
+
+            option_part := substring(url, index + 1)
+            
+            options_str := split("&", option_part)
+            for @ptr options_str.sliced() {
+                pair := split("=", options_str.sliced())
+                if pair.len != 2
+                    continue
+                if pair[0] == "id" {
+                    log("id=",pair[1])
+                }
+            }
+
+            path := substring(url, 0, index)
             
             // ##########
             //  RESPOND

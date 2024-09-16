@@ -1,0 +1,290 @@
+/*
+    This file is responsible for managing jobs.
+    - Storing them on disc upon shutdown.
+    - Scheduling and running jobs.
+    - API for inserting and retrieving information from the frontend.
+
+    Details:
+        Create jobs
+
+    Things to think about:
+      - You should be able to move the jobsystem files to another directory.
+        All paths should be relative for this to work.
+*/
+
+#import "Logger"
+#import "Array"
+#import "String"
+#import "File"
+#import "Stream"
+
+enum Timestamp : u64 {
+    TIME_ZERO,
+}
+enum OutputHandle : i64 {
+    HANDLE_ZERO,
+}
+#macro JOB_STATIC_SIZE 40 // 3 * 8 + 2*4
+struct Job {
+    id: u32;
+    output_handle: OutputHandle;
+    started: Timestamp;
+    finished: Timestamp;
+    created: Timestamp;
+
+    // fields with varied length last, easier to serialize
+    name: StringBuilder;
+    description: StringBuilder;
+}
+
+struct OutputData {
+    stdout_path: StringBuilder;
+    raw_data: StringBuilder;
+}
+
+// One instance per runtime
+struct JobSystem {
+    jobs: Array<Job>;
+    outputs: Array<OutputData>;
+
+    rootdir: StringBuilder; // derived from the directory the job system file was read from, it is not stored in the file itself because you would run into problems if you moved it.
+    created: Timestamp;
+    next_job_id: i32; // also the total number of created jobs
+
+    // per session, not serialized
+    started: Timestamp;
+    initialized: bool;
+
+    fn initialize(path: char[]) {
+        if initialized {
+            log("JobSystem already initialized!")
+            return;
+        }
+        initialized = true;
+        rootdir.append(path)
+
+        job_path: StringBuilder // path to information of the job system
+        job_path.append(rootdir)
+        job_path.join_path("endercompute.dat")
+
+        if(FileExist(job_path)) {
+            yes := load_from_file(job_path)
+            if !yes {
+                log("Could not load ", job_path)
+                return;
+            }
+        } else {
+            // create new system
+            log("Create new")
+            created = cast_unsafe<Timestamp>StartMeasure();
+        }
+
+        started = cast_unsafe<Timestamp>StartMeasure();
+    }
+
+    fn create_job(name: char[], desc: char[]) {
+        job := jobs.add()
+        
+        job.id = next_job_id++
+        job.name.append(name)
+        job.description.append(desc)
+
+        job.created = cast_unsafe<Timestamp>StartMeasure()
+    }
+
+    fn find_job(name: char[]) -> Job* {
+        for 0..jobs.size() {
+            job := jobs.get_unsafe(nr)
+            if job.name == name
+                return job
+        }
+        return null
+    }
+    fn find_job(id: i32) -> Job* {
+        for 0..jobs.size() {
+            job := jobs.get_unsafe(nr)
+            if job.id == id
+                return job
+        }
+        return null
+    }
+
+    fn save_to_file(path: char[]) -> bool {
+        file := FileOpen(path, FILE_CLEAR_AND_WRITE)
+        if !file
+            return false;
+        defer FileClose(file)
+
+        stream: ByteStream
+
+        header := cast<FileJobSystem_Header*>stream.write_late(sizeof FileJobSystem_Header)
+
+        header.magic = HEADER_MAGIC
+        header.version = 1
+
+        header.job_count = jobs.size()
+        header.output_count = outputs.size()
+        header.next_job_id = next_job_id
+        header.created = created
+
+        header.job_offset = stream.get_write_head()
+
+        for 0..jobs.size() {
+            job := jobs.get_unsafe(nr)
+
+            stream.write(job, JOB_STATIC_SIZE)
+
+            stream.write<u8>(job.name.size())
+            stream.write(job.name.data(), job.name.size())
+
+            stream.write<u16>(job.description.size())
+            stream.write(job.description.data(), job.description.size())
+        }
+
+        header.output_offset = stream.get_write_head()
+        
+        for 0..outputs.size() {
+            output := outputs.get_unsafe(nr)
+
+            stream.write<u16>(output.stdout_path.size())
+            stream.write(output.stdout_path.data(), output.stdout_path.size())
+
+            stream.write<i32>(output.raw_data.size())
+            stream.write(output.raw_data.data(), output.raw_data.size())
+        }
+
+        iter := stream.create_iterator()
+        while stream.iterate(&iter)
+            FileWrite(file, iter.ptr, iter.size)
+
+        return true
+    }
+    fn load_from_file(path: char[]) -> bool {
+        filesize: i64
+        file := FileOpen(path, FILE_READ_ONLY, &filesize)
+        if !file
+            return false;
+        defer FileClose(file)
+
+        stream: ByteStream
+
+        data := stream.write_late(filesize)
+        if !data
+            return false;
+        defer Free(data)
+        
+        yes := FileRead(file, data, filesize)
+        if !yes
+            return false
+
+        header := cast<FileJobSystem_Header*>data
+
+        if header.magic != HEADER_MAGIC
+            return false;
+        
+        if header.version != 1 {
+            log("When reading job system from file: The version was ",header.version," but only version 1 is supported")
+            return false;   
+        }
+
+        // if initialized {
+        //     log("Cannot load file, job system already initialized")
+        //     return false
+        // }
+        // initialized = true
+
+        created = header.created
+        next_job_id = header.next_job_id
+
+        jobs.resize(header.job_count)
+        outputs.resize(header.output_count)
+
+        read_head: i32 = header.job_offset
+
+        for 0..jobs.size() {
+            job := jobs.get_unsafe(nr)
+
+            stream.read(read_head, job, JOB_STATIC_SIZE)
+            read_head += JOB_STATIC_SIZE
+
+            len: u8;
+            stream.read(read_head, &len, sizeof(len))
+            read_head += sizeof(len)
+            job.name.resize(len)
+            stream.read(read_head, job.name.data(), len)
+            read_head += len
+
+            {
+                len: u16;
+                stream.read(read_head, &len, sizeof(len))
+                read_head += sizeof(len)
+                job.description.resize(len)
+                stream.read(read_head, job.description.data(), len)
+                read_head += len
+            }
+        }
+
+        read_head = header.output_offset
+        
+        for 0..outputs.size() {
+            output := outputs.get_unsafe(nr)
+
+            len: u16;
+            stream.read(read_head, &len, sizeof(len))
+            read_head += sizeof(len)
+            output.stdout_path.resize(len)
+            stream.read(read_head, output.stdout_path.data(), len)
+            read_head += len
+
+            {
+                len: u32;
+                stream.read(read_head, &len, sizeof(len))
+                read_head += sizeof(len)
+                output.raw_data.resize(len)
+                stream.read(read_head, output.raw_data.data(), len)
+                read_head += len
+            }
+        }
+
+        return true;
+    }
+}
+
+fn InitJobSystem(path: char[]) -> JobSystem* {
+    system := cast<JobSystem*>Allocate(sizeof JobSystem)
+    construct(system)
+
+    system.initialize(path)
+
+    return system
+}
+
+// ######################
+//    File formats
+// ######################
+
+// Job system stores:
+//   - A file for the job system itself
+//   - Files for the output of the jobs  
+
+#macro HEADER_MAGIC 0x534a4345 // ECJS (ender compute job system)
+struct FileJobSystem_Header {
+    // NOTE: Fields with fixed size comes first
+
+    // The same for every version
+    magic: i32; // A constant
+    version: i32;
+
+    // Mostly the same for every version
+    job_count: i32;
+    job_offset: i32; // relative to start of file
+    output_count: i32;
+    output_offset: i32; // relative to start of file
+    next_job_id: i32;
+    created: Timestamp;
+
+    // NOTE: Fields with varied size comes next
+
+    // jobs: Job[job_count]
+    // outputs: OutputData[output_count]
+}
