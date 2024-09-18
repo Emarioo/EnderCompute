@@ -7,7 +7,7 @@
 #import "HTTP"
 
 struct Session {
-    server: Server;
+    server: HTTPServer*;
     job_system: JobSystem*;
     
     fn save() {
@@ -21,318 +21,176 @@ fn start_webserver() {
     session: Session;
     session.job_system = InitJobSystem("data")
     
-    session.server.set_callback(handle_event, &session)
-    err := session.server.start(port)
+    session.server = StartHTTPServer(port, handle_event, &session)
+    if session.server {
+        log("Started server at port ",port)
+        session.server.wait()
+    }
     
-    log("Started server at port ",port)
-    
-    fn handle_event(e: Event, user_data: void*) {
+    fn handle_event(request: HTTPRequest*, e: Event, user_data: void*) {
         session := cast<Session*>user_data
-        server := &session.server
-        if e.type == EVENT_RECEIVE {
-            // log("Event recv:")
-            // log(e.bytes)
-            //#################
-            //  PARSE HEADER
-            // ################
-            msg := e.bytes
-            
-            head := 0
-            
-            if substring(msg,0,4) == "GET " {
-                head += 4
-            } else if substring(msg,0,5) == "POST " {
-                head += 5
-            } else {
-                log("missing GET or POST")
-                return;
-            }
-            
-            path_start := head
-            while head < msg.len {
-                chr := msg[head]
-                head++
-                if chr == ' ' || chr == '\n' || chr == '\r' || chr == '\t'
-                    break
-            }
-            
-            url: StringBuilder
-            defer url.cleanup()
-            url.append(substring(msg,path_start,head-1))
-            
-            version := "HTTP/1.1\r\n"
-            if substring(msg,head,head + version.len) != version {
-                log("missing HTTP/1.1, or path was bad '",url,"'")
-                return;
-            }
-            head += version.len
-            
-            fields: Array<char[]>
-            defer fields.cleanup()
-            field_start := head
-            while {
-                chr := msg[head]
-                chr2: char
-                if head+1 < msg.len
-                    chr2 = msg[head+1]
-                head++
+        server := session.server
+        
+        path := request.route
+        content := request.content
+        
+        if !IsPathSanitized(path) {
+            // log("path is not safe")
+            return;
+        }
+        fn empty(s: char[]*) -> char[] {
+            if s
+                return *s
+            return {}
+        }
+        if path == "/api/create" {
+            fields_loop := split("\n", content)
+            defer fields_loop.cleanup()
+            name: char[]
+            desc: char[]
+            for fields_loop.sliced() {
+                mini_fields := split("=", it)
+                defer mini_fields.cleanup()
                 
-                if chr == '\r' && chr2 ==  '\n' {
-                    if field_start + 1 == head {
-                        // reached final newline
-                        head++
-                        break
-                    }
-                    
-                    fields.add(substring(msg, field_start, head))
-                    
-                    head++
-                    field_start = head
-                }
-            }
-            content_length: i32
-            content_data: char* = msg.ptr + head;
-            for fields.sliced() {
-                // log("field ",nr," ", it)
-                pair := split(":", it)
-                defer pair.cleanup()
-                
-                if pair.size() != 2
+                if mini_fields.size() != 2
                     continue
-                key := pair.get(0)
-                val := pair.get(1)
-                if key == "Content-Length" {
-                    value_str := substring(val, 1)
-                    content_length = parse_i64(value_str)
-                }
+                
+                key := mini_fields[0]
+                val := mini_fields[1]
+                if key == "name"
+                    name = val
+                else if key == "desc"
+                    desc = val
             }
             
-            // log("get ",path)
-
-            // calculate options
-            index := find("?", url)
-            // log(url, " ", index)
-
-            option_part := substring(url, index + 1)
+            // log("content:\n", content)
+            // log("name:", name)
+            // log("desc:", desc)
             
-            options_str := split("&", option_part)
-            defer options_str.cleanup()
-            option_id: char[] = {}
-            for options_str.sliced() {
-                pair := split("=", it)
-                defer pair.cleanup()
-                if pair.len != 2
-                    continue
-                if pair[0] == "id" {
-                    option_id = pair[1]
-                    // log("id=",pair[1])
-                }
-            }
-
-            path := substring(url, 0, index)
+            // TODO: Check if name or desc is empty
+            session.job_system.create_job(name, desc)
             
-            // log(url, " ",path)
+            server.send(200, {}, e.who)
+            return;
+        } else if path == "/api/get" {
+            // TODO: check if parse failed
             
-            // ##########
-            //  RESPOND
-            // ##########
+            str_id := empty(request.queries.find("id"))
+            id: i32 = parse_i64(str_id)
             
-            if !IsPathSanitized(path) {
-                // log("path is not safe")
-                return;   
-            }
+            job := session.job_system.find_job(id)
             
-            if path == "/api/create" {
-                
-                content: char[] = {content_data, content_length}
-                
-                fields_loop := split("\n", content)
-                defer fields_loop.cleanup()
-                name: char[]
-                desc: char[]
-                for fields_loop.sliced() {
-                    mini_fields := split("=", it)
-                    defer mini_fields.cleanup()
-                    
-                    if mini_fields.size() != 2
-                        continue
-                    
-                    key := mini_fields[0]
-                    val := mini_fields[1]
-                    if key == "name"
-                        name = val
-                    else if key == "desc"
-                        desc = val
-                }
-                
-                // log("content:\n", content)
-                // log("name:", name)
-                // log("desc:", desc)
-                
-                // TODO: Check if name or desc is empty
-                session.job_system.create_job(name, desc)
-                
-                response: StringBuilder
-                defer response.cleanup()
-                
-                response.append("HTTP/1.1 200 OK\r\n")
-                response.append("Content-Length: 0\r\n")
-                response.append("Connection: close\r\n")
-                response.append("\r\n")
-                
-                // nocheckin TODO: Fix 16-byte alignment bug, CreateFileA crashes if we uncomment return below.
-                // server.send<char>(response.sliced(), who = e.who)
-                // return;
-            } else if path == "/api/get" {
-                // TODO: check if parse failed
-                id: i32 = parse_i64(option_id)
-                
-                job := session.job_system.find_job(id)
-                
-                response: StringBuilder
-                defer response.cleanup()
-                
-                if !job {
-                    response.append("HTTP/1.1 404 Not Found\r\n")
-                    response.append("Connection: close\r\n")
-                    response.append("\r\n")
-                        
-                    server.send<char>(response.sliced(), who = e.who)
-                    return;
-                }
-                
-                data: StringBuilder
-                defer data.cleanup()
-                
-                data.append("{")
-                
-                #macro FIELD(K,V)
-                data.append("\"")
-                data.append(K)
-                data.append("\":")
-                data.append(V)
-                // data.append(",")
-                #endmacro
-                #macro FIELD_S(K,V)
-                data.append("\"")
-                data.append(K)
-                data.append("\":")
-                data.append("\"")
-                data.append(V)
-                data.append("\"")
-                // data.append(",")
-                #endmacro
-                
-                                 FIELD_S("name"         , job.name)
-                data.append(",")   FIELD("id"           , job.id)
-                data.append(",") FIELD_S("description"  , job.description)
-                data.append(",")   FIELD("created"      , cast<i64>job.created)
-                data.append(",")   FIELD("started"      , cast<i64>job.started)
-                data.append(",")   FIELD("finished"     , cast<i64>job.finished)
-                data.append(",")   FIELD("output_handle", cast<i32>job.output_handle)
-                
-                data.append("}")
-                
-                response.append("HTTP/1.1 200 OK\r\n")
-                response.append("Content-Length: ")
-                response.append(data.size())
-                response.append("\r\n")
-                response.append("Connection: close\r\n")
-                response.append("\r\n")
-                
-                response.append(data)
-                
-                server.send<char>(response.sliced(), who = e.who)
+            if !job {
+                server.send(404, {}, e.who)
                 return;
-            } else  if path == "/api/list" {
-                data: StringBuilder
-                defer data.cleanup()
-                
-                data.append("{")
-                data.append("\"jobs\":[")
-                
-                for @ptr session.job_system.jobs.sliced() {
-                    if nr != 0
-                        data.append(",")
-                    
-                    data.append("{")
-                    data.append("\"id\":")
-                    data.append(it.id)
+            }
+            
+            data: StringBuilder
+            defer data.cleanup()
+            
+            data.append("{")
+            
+            #macro FIELD(K,V)
+            data.append("\"")
+            data.append(K)
+            data.append("\":")
+            data.append(V)
+            // data.append(",")
+            #endmacro
+            #macro FIELD_S(K,V)
+            data.append("\"")
+            data.append(K)
+            data.append("\":")
+            data.append("\"")
+            data.append(V)
+            data.append("\"")
+            // data.append(",")
+            #endmacro
+            
+                                FIELD_S("name"         , job.name)
+            data.append(",")   FIELD("id"           , job.id)
+            data.append(",") FIELD_S("description"  , job.description)
+            data.append(",")   FIELD("created"      , cast<i64>job.created)
+            data.append(",")   FIELD("started"      , cast<i64>job.started)
+            data.append(",")   FIELD("finished"     , cast<i64>job.finished)
+            data.append(",")   FIELD("output_handle", cast<i32>job.output_handle)
+            
+            data.append("}")
+            
+            server.send(200, data.sliced(), e.who)
+            return;
+        } else  if path == "/api/list" {
+            data: StringBuilder
+            defer data.cleanup()
+            
+            data.append("{")
+            data.append("\"jobs\":[")
+            
+            for @ptr session.job_system.jobs.sliced() {
+                if nr != 0
                     data.append(",")
-                    data.append("\"name\":")
-                    data.append("\"")
-                    data.append(it.name)
-                    data.append("\"")
-                    data.append("}")
-                }
                 
-                data.append("]}")
-                
-                response: StringBuilder
-                response.append("HTTP/1.1 200 OK\r\n")
-                response.append("Content-Length: ")
-                response.append(data.size())
-                response.append("\r\n")
-                response.append("Connection: close\r\n")
-                response.append("\r\n")
-                
-                response.append(data)
-                
-                server.send<char>(response.sliced(), who = e.who)
-                return;
+                data.append("{")
+                data.append("\"id\":")
+                data.append(it.id)
+                data.append(",")
+                data.append("\"name\":")
+                data.append("\"")
+                data.append(it.name)
+                data.append("\"")
+                data.append("}")
             }
             
-            real_path: StringBuilder
-            defer real_path.cleanup()
-            real_path.append("public")
-            if(path[0] == '/') {
-                if path == "/" {
-                    real_path.append("/index.html")
-                } else {
-                    real_path.append(path)
-                }
+            data.append("]}")
+            
+            server.send(200, data.sliced(), e.who)
+            return;
+        }
+        
+        real_path: StringBuilder
+        defer real_path.cleanup()
+        real_path.append("public")
+        if(path[0] == '/') {
+            if path == "/" {
+                real_path.append("/index.html")
             } else {
-                return; // suspicious, path in header always begins with slash
+                real_path.append(path)
             }
+        } else {
+            server.send(404, {}, e.who)
+            return; // suspicious, path in header always begins with slash
+        }
+
+        // nocheckin IMPORTANT: 16-byte alignment BUG, if we add even (or odd?) number of local variables bug will go away.
+        filesize: i64
+        file := FileOpen(real_path, FILE_READ_ONLY, &filesize)
+        if !file {
+            server.send(404, {}, e.who)
+            // log("send: Not Found")
+        } else {
+            defer FileClose(file)
             
             response: StringBuilder
             defer response.cleanup()
+        
+            response.reserve(300 + filesize)
             
-            filesize: i64
-            file := FileOpen(real_path, FILE_READ_ONLY, &filesize)
-            if !file {
-                response.append("HTTP/1.1 404 Not Found\r\n")
-                response.append("Connection: close\r\n")
-                response.append("\r\n")
-                // log("send: Not Found")
-            } else {
-                defer FileClose(file)
-                
-                response.append("HTTP/1.1 200 OK\r\n")
-                response.append("Content-Length: ")
-                response.append(filesize)
-                response.append("\r\n")
-                response.append("Connection: close\r\n")
-                response.append("\r\n")
-                
-                header_len := response.len
-                response.resize(header_len + filesize)
-                
-                err := FileRead(file, response.ptr + header_len, filesize)
-                if !err {
-                    log("FileRead failed on ", real_path)
-                    // TODO: Send back error
-                    return;
-                }
-                // log("send: ",real_path)
+            server.build_response(&response, 200, filesize)
+            
+            header_len := response.size()
+            response.resize(header_len + filesize)
+            
+            err := FileRead(file, response.ptr + header_len, filesize)
+            if !err {
+                log("FileRead failed on ", real_path)
+                server.send(404, {}, e.who)
+                return;
             }
             
-            server.send<char>(response.sliced(), who = e.who)
+            server.send_built_response(&response, e.who)
+            // log("send: ",real_path)
         }
     }
-    
-    session.server.wait()
-    session.server.close()
 }
 
 fn IsPathSanitized(path: char[]) -> bool {
