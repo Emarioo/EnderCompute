@@ -43,9 +43,10 @@
                 <div hidden class="createinfo">
                     <h2>Create new job</h2>
                     <span>Job name:</span><input placeholder="job_0"></input> <br>
+                    <span>Description:</span><input placeholder="Sour diamonds"></input> <br>
                     <span>Script to run:</span><input placeholder="btb --test"></input> <br>
                     
-                    <button onclick="click_create_job(this)"></button>
+                    <button onclick="click_create_job(this)">Create job</button>
                 </div>
             </div>
         </div>
@@ -135,6 +136,18 @@
                     
                     fetch("api/get?id=" + id).then((res)=> res.json()).then((data) => {
                         console.log(data)
+                        let jobdesc = document.getElementsByClassName("jobdesc")[0]
+                        jobdesc.innerHTML = ""
+                        + "<h3>Status info</h3>"
+                        + "<p>Created at:"+data.created+"</p>"
+                        + "<p>Started at:"+data.started+"</p>"
+                        + "<p>Finished at:"+data.finished+"</p>"
+                        + "<p>Running time:"+(data.finished-data.started)+"</p>"
+                        + "<h3>Description</h3>"
+                        + "<p>"+data.description+"</p>"
+                        // "<p>Job type/script + arguments</p>"
+                        // "<p>Which tests ran, what was built?</p>"
+                        
                     })
                 } else {
                     jobinfo.hidden = true;
@@ -164,6 +177,8 @@
                         // 'Content-Type': 'application/json'
                     // },
                     body: data
+                }).then((res)=>{
+                    console.log(res)
                 })
             }
         </script>

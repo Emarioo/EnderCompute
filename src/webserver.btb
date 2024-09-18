@@ -4,10 +4,15 @@
 #import "OS"
 #import "Threads"
 #import "backend"
+#import "HTTP"
 
 struct Session {
     server: Server;
     job_system: JobSystem*;
+    
+    fn save() {
+        job_system.save_to_file("data/endercompute.dat")
+    }
 }
 
 fn start_webserver() {
@@ -36,7 +41,7 @@ fn start_webserver() {
             
             if substring(msg,0,4) == "GET " {
                 head += 4
-            } else substring(msg,0,5) == "POST " {
+            } else if substring(msg,0,5) == "POST " {
                 head += 5
             } else {
                 log("missing GET or POST")
@@ -63,8 +68,8 @@ fn start_webserver() {
             head += version.len
             
             fields: Array<char[]>
-            defer fields.cleanup
-            field_start := 0
+            defer fields.cleanup()
+            field_start := head
             while {
                 chr := msg[head]
                 chr2: char
@@ -72,9 +77,12 @@ fn start_webserver() {
                     chr2 = msg[head+1]
                 head++
                 
-                if chr == '\r' && chr2 == '\n' {
-                    if field_start + 1 == head // reached final newline
+                if chr == '\r' && chr2 ==  '\n' {
+                    if field_start + 1 == head {
+                        // reached final newline
+                        head++
                         break
+                    }
                     
                     fields.add(substring(msg, field_start, head))
                     
@@ -83,8 +91,9 @@ fn start_webserver() {
                 }
             }
             content_length: i32
-            content_data: char* = msg + head;
+            content_data: char* = msg.ptr + head;
             for fields.sliced() {
+                // log("field ",nr," ", it)
                 pair := split(":", it)
                 defer pair.cleanup()
                 
@@ -107,6 +116,7 @@ fn start_webserver() {
             option_part := substring(url, index + 1)
             
             options_str := split("&", option_part)
+            defer options_str.cleanup()
             option_id: char[] = {}
             for options_str.sliced() {
                 pair := split("=", it)
@@ -137,13 +147,29 @@ fn start_webserver() {
                 content: char[] = {content_data, content_length}
                 
                 fields_loop := split("\n", content)
-                defer fields.cleanup()
+                defer fields_loop.cleanup()
                 name: char[]
                 desc: char[]
-                for fields.sliced() {
+                for fields_loop.sliced() {
+                    mini_fields := split("=", it)
+                    defer mini_fields.cleanup()
                     
+                    if mini_fields.size() != 2
+                        continue
+                    
+                    key := mini_fields[0]
+                    val := mini_fields[1]
+                    if key == "name"
+                        name = val
+                    else if key == "desc"
+                        desc = val
                 }
                 
+                // log("content:\n", content)
+                // log("name:", name)
+                // log("desc:", desc)
+                
+                // TODO: Check if name or desc is empty
                 session.job_system.create_job(name, desc)
                 
                 response: StringBuilder
@@ -153,6 +179,10 @@ fn start_webserver() {
                 response.append("Content-Length: 0\r\n")
                 response.append("Connection: close\r\n")
                 response.append("\r\n")
+                
+                // nocheckin TODO: Fix 16-byte alignment bug, CreateFileA crashes if we uncomment return below.
+                // server.send<char>(response.sliced(), who = e.who)
+                // return;
             } else if path == "/api/get" {
                 // TODO: check if parse failed
                 id: i32 = parse_i64(option_id)
@@ -181,7 +211,7 @@ fn start_webserver() {
                 data.append(K)
                 data.append("\":")
                 data.append(V)
-                data.append(",")
+                // data.append(",")
                 #endmacro
                 #macro FIELD_S(K,V)
                 data.append("\"")
@@ -190,16 +220,16 @@ fn start_webserver() {
                 data.append("\"")
                 data.append(V)
                 data.append("\"")
-                data.append(",")
+                // data.append(",")
                 #endmacro
                 
-                FIELD_S("name", job.name)
-                FIELD("id", job.id)
-                FIELD_S("description", job.description)
-                FIELD("created",  cast<i64>job.created)
-                FIELD("started",  cast<i64>job.started)
-                FIELD("finished", cast<i64>job.finished)
-                FIELD("output_handle", cast<i32>job.output_handle)
+                                 FIELD_S("name"         , job.name)
+                data.append(",")   FIELD("id"           , job.id)
+                data.append(",") FIELD_S("description"  , job.description)
+                data.append(",")   FIELD("created"      , cast<i64>job.created)
+                data.append(",")   FIELD("started"      , cast<i64>job.started)
+                data.append(",")   FIELD("finished"     , cast<i64>job.finished)
+                data.append(",")   FIELD("output_handle", cast<i32>job.output_handle)
                 
                 data.append("}")
                 
