@@ -43,7 +43,15 @@ fn start_webserver() {
                 return *s
             return {}
         }
-        if path == "/api/create" {
+        if path == "/api/auth" {
+            auth_key := "cat" // read key from file
+            
+            if content == auth_key {
+                server.send(200, {}, e.who)
+            } else {
+                server.send(401, {}, e.who) // 401 = Unauthorized
+            }
+        } else if path == "/api/create" {
             fields_loop := split("\n", content)
             defer fields_loop.cleanup()
             name: char[]
@@ -126,7 +134,8 @@ fn start_webserver() {
             data.append("{")
             data.append("\"jobs\":[")
             
-            for @ptr session.job_system.jobs.sliced() {
+            // get jobs in reverse, last job is shown first in the list
+            for @rev @ptr session.job_system.jobs.sliced() {
                 if nr != 0
                     data.append(",")
                 
@@ -195,7 +204,7 @@ fn start_webserver() {
 
 fn IsPathSanitized(path: char[]) -> bool {
     // Crude sanitization
-    if path.ptr[0] != '/'
+    if !path.ptr || path.ptr[0] != '/'
        return false
     for 1..path.len {
         chr := path[nr]

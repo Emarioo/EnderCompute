@@ -26,5 +26,5 @@ It will have the job system backend and a web interface.
 # Version 0.1.0
 
 - Command line interface
-
+- Rebuild jobs
 - Filters and search bar for jobs

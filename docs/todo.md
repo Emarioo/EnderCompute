@@ -10,6 +10,9 @@ Management related
 # Interface
 - Plan the web UI
 - Plan the command line interface
+- Create the web interface
 
 # Backend
 - Plan the system
+- How to run jobs
+- Authentication, authorization

@@ -27,7 +27,11 @@ The executable will store information that should persist in the rootdir you spe
 btb src/main
 ```
 
-Yes, that's it. Now you know why I chose BetterThanBatch.
+That's it... Is what I would like to say but you need to download/install OpenSSL. You can run the program without it (no HTTPS) but it wouldn't be secure.
+
+```
+btb src/main -m SKIP_OPENSSL
+```
 
 ## Products and software
 The project develops two software products.

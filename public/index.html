@@ -5,50 +5,57 @@
         <link rel="stylesheet" href="style.css">
     </head>
     <body>
-        <h1 style="font-family: 'Courier New', Courier, monospace;">Welcome to the <span style="font-weight: bold;">Ender Compute</span> interface</h1>
-        
         <div class="content">
-            <div class="sidebar" onclick="deselect_all()">
-                <h2>Jobs</h2>
-                <button onclick="show_create_job(this)">Create</button>
-                <!-- You can deselect a job by clicking the joblist background -->
-                <ul class="joblist">
-                    <!-- TODO: add progress bar and icon indicating status -->
-                    <li onclick="click_job(this)">Job 1</li>
-                    <li onclick="click_job(this)">Job with long name</li>
-                </ul>
-            </div>
-            <div class="jobinfo_back">
-                <h2 class="hint_text">Click on a job for it's information and actions</h2>
-                <!-- <div class="jobinfo""> -->
-                <div hidden class="jobinfo"">
-                    <h2>Job title</h2>
-                    <div class="jobdesc">
-                        <h3>Status info</h3>
-                        <p>Scheduled at:</p>
-                        <p>Started at:</p>
-                        <p>Finished at:</p>
-                        <p>Running time:</p>
-                        <p>Job type/script + arguments</p>
-                        <p>Which tests ran, what was built?</p>
-                        <p>(description)</p>
+            <h1 style="font-family: 'Courier New', Courier, monospace;">Welcome to the <span style="font-weight: bold;">Ender Compute</span> interface</h1>
+            
+            <div class="job-content">
+                <div class="sidebar" onclick="deselect_all()">
+                    <h2>Jobs</h2>
+                    <button onclick="show_create_job(this)">Create</button>
+                    <!-- You can deselect a job by clicking the joblist background -->
+                    <ul class="joblist">
+                        <!-- TODO: add progress bar and icon indicating status -->
+                        <li onclick="click_job(this)">Job 1</li>
+                        <li onclick="click_job(this)">Job with long name</li>
+                    </ul>
+                </div>
+                <div class="jobinfo_back">
+                    <h2 class="hint_text">Click on a job for it's information and actions</h2>
+                    <!-- <div class="jobinfo""> -->
+                    <div hidden class="jobinfo"">
+                        <h2>Job title</h2>
+                        <div class="jobdesc">
+                            <h3>Status info</h3>
+                            <p>Scheduled at:</p>
+                            <p>Started at:</p>
+                            <p>Finished at:</p>
+                            <p>Running time:</p>
+                            <p>Job type/script + arguments</p>
+                            <p>Which tests ran, what was built?</p>
+                            <p>(description)</p>
+                        </div>
+                        <div class="joboutput">
+                        <h3>Output</h3>
+                            <span>
+                                A lot of text from stdout, stderr what has been run and stuff.
+                            </span>
+                        </div>
                     </div>
-                    <div class="joboutput">
-                    <h3>Output</h3>
-                        <span>
-                            A lot of text from stdout, stderr what has been run and stuff.
-                        </span>
+                    <div hidden class="createinfo">
+                        <h2>Create new job</h2>
+                        <span>Job name:</span><input placeholder="job_0"></input> <br>
+                        <span>Description:</span><input placeholder="Sour diamonds"></input> <br>
+                        <span>Script to run:</span><input placeholder="btb --test"></input> <br>
+                        
+                        <button onclick="click_create_job(this)">Create job</button>
                     </div>
                 </div>
-                <div hidden class="createinfo">
-                    <h2>Create new job</h2>
-                    <span>Job name:</span><input placeholder="job_0"></input> <br>
-                    <span>Description:</span><input placeholder="Sour diamonds"></input> <br>
-                    <span>Script to run:</span><input placeholder="btb --test"></input> <br>
-                    
-                    <button onclick="click_create_job(this)">Create job</button>
-                </div>
             </div>
+        </div>
+        
+        <div hidden class="auth-form">
+            <h1>You are not authenticated</h1>
+            <input class="auth-input" placeholder="key" onkeydown="auth_form_onkeydown(this)">
         </div>
         
         <script>
@@ -66,7 +73,6 @@
                 return template.content.firstChild;
             }
             
-            update_joblist()
             function update_joblist() {
                 fetch("api/list").then((res)=> res.json()).then((data) => {
                     // console.log(data)
@@ -135,7 +141,7 @@
                     jobinfo.hidden = false;
                     
                     fetch("api/get?id=" + id).then((res)=> res.json()).then((data) => {
-                        console.log(data)
+                        // console.log(data)
                         let jobdesc = document.getElementsByClassName("jobdesc")[0]
                         jobdesc.innerHTML = ""
                         + "<h3>Status info</h3>"
@@ -172,15 +178,76 @@
                 
                 fetch("api/create", {
                     method: 'POST',
-                    // headers: {
-                        // 'Accept': 'application/json',
-                        // 'Content-Type': 'application/json'
-                    // },
                     body: data
                 }).then((res)=>{
                     console.log(res)
                     update_joblist()
                 })
+            }
+            var times_failed_auth = 0;
+            function auth_form_onkeydown(element) {
+                // console.log(element,event)
+                if (event.code == "Enter") {
+                    // check that new key isn't empty and give user warning
+                    // do we have disallowed characters?
+                    let new_key = element.value;
+                    let key_inp = document.getElementsByClassName("auth-input")[0]
+                    key_inp.classList.add("entered-key")
+                    
+                    fetch("api/auth", {
+                        method: 'POST',
+                        body: new_key // TODO: Make this safe, encrypt...
+                    }).then((res)=>{
+                        // console.log(res)
+                        if (res.status == 200) {
+                            set_auth_key(element.value)
+                            set_authentication_panel(false);
+                        } else {
+                            times_failed_auth++
+                            // show error message
+                            let form = document.getElementsByClassName("auth-form")[0];
+                            let title = form.getElementsByTagName("h1")[0]
+                            let key_inp = document.getElementsByClassName("auth-input")[0]
+                            setTimeout(()=>{
+                                key_inp.classList.remove("entered-key")
+                            }, 200)
+                            title.innerText = "Key is not correct"
+                            if (times_failed_auth > 1) {
+                                title.innerText += " ("+times_failed_auth+")"
+                            }
+                        }
+                    })
+                }
+            }
+            var STORAGE_NAME_AUTH_KEY = "endercompute-key"
+            function set_auth_key(key) {
+                if (key == null)
+                    localStorage.removeItem(STORAGE_NAME_AUTH_KEY)
+                else
+                    localStorage.setItem(STORAGE_NAME_AUTH_KEY, key)
+            }
+            // auth key can be null
+            function get_auth_key() {
+                return localStorage.getItem(STORAGE_NAME_AUTH_KEY)
+            }
+            function set_authentication_panel(visible) {
+                let content = document.getElementsByClassName("content")[0]
+                let form = document.getElementsByClassName("auth-form")[0]
+                if(visible) {
+                    content.classList.add("do-blur")
+                    form.hidden = false;
+                } else {
+                    content.classList.remove("do-blur")
+                    form.hidden = true;
+                }
+            }
+            // TODO: Button for clear_local_storage()  auth key, 
+            
+            let auth_key = get_auth_key()
+            if (auth_key) {
+                update_joblist()
+            } else {
+                set_authentication_panel(true)
             }
         </script>
     </body>

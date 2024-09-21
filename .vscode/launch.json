@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
         {
             "name": "main.exe GDB",
             "type": "cppdbg",
@@ -28,6 +29,18 @@
                     "ignoreFailures": true
                 }
             ]
+        },
+        {
+            "name": "VS btb webserver",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/../BetterThanBatch/bin/btb.exe",
+            "args": ["src/main","-r","-d"],
+            "stopAtEntry": false,
+            "externalConsole": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal"
         }
     ]
 }
