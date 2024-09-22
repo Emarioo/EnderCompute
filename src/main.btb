@@ -5,8 +5,33 @@
 #import "Logger"
 #import "webserver"
 #import "backend"
+#import "Linux"
 
 fn main() -> i32 {
+
+    // real_path := "public/index.html"
+    // buf := Allocate(50)
+    
+    // // fd := open(real_path.ptr, O_RDONLY, S_IRUSR | S_IWUSR)
+    // // log("fd ", fd)
+    // // err := read(fd, buf, 10)
+    // // log("err ",err)
+    
+    // filesize: i64
+    // file := FileOpen(real_path, FILE_READ_ONLY, &filesize)
+    // if !file {
+    //     log("bad file")
+    //     return 1;
+    // } else {
+        
+    //     log("reading file...")
+    //     err := FileRead(file, buf, 10)
+    //     if !err {
+    //         log("FileRead failed on ", real_path)
+    //         return 1;
+    //     }
+    //     log("sent: ",real_path, " ",filesize)
+    // }
 
     // std_print_any(sys, true) log()
     // sys.create_job("chicken","lovely")

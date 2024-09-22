@@ -54,7 +54,7 @@
         </div>
         
         <div hidden class="auth-form">
-            <h1>You are not authenticated</h1>
+            <h1>You are not authorized</h1>
             <input class="auth-input" placeholder="key" onkeydown="auth_form_onkeydown(this)">
         </div>
         
@@ -74,7 +74,7 @@
             }
             
             function update_joblist() {
-                fetch("api/list").then((res)=> res.json()).then((data) => {
+                auth_fetch("api/list").then((res)=> res.json()).then((data) => {
                     // console.log(data)
                     let joblist = document.getElementsByClassName("joblist")[0]
                     while(joblist.children.length>0) {
@@ -140,7 +140,7 @@
                 if (element) {
                     jobinfo.hidden = false;
                     
-                    fetch("api/get?id=" + id).then((res)=> res.json()).then((data) => {
+                    auth_fetch("api/get?id=" + id).then((res)=> res.json()).then((data) => {
                         // console.log(data)
                         let jobdesc = document.getElementsByClassName("jobdesc")[0]
                         jobdesc.innerHTML = ""
@@ -176,13 +176,26 @@
                 let data = "name=" + inputs[0].value + "\n"
                          + "desc=" + inputs[1].value + "\n"
                 
-                fetch("api/create", {
+                auth_fetch("api/create", {
                     method: 'POST',
                     body: data
                 }).then((res)=>{
                     console.log(res)
                     update_joblist()
                 })
+            }
+            function auth_fetch(path, options) {
+                let key = get_auth_key()
+                if(options == null)
+                    options = {}
+                if (key != null) {
+                    let headers = options["headers"]
+                    if (headers == undefined) {
+                        headers = options["headers"] = {}
+                    }
+                    headers["Authorization"] = key;
+                }
+                return fetch(path, options)
             }
             var times_failed_auth = 0;
             function auth_form_onkeydown(element) {
@@ -218,6 +231,9 @@
                         }
                     })
                 }
+            }
+            function on_unauthorized() {
+                set_authentication_panel(true)
             }
             var STORAGE_NAME_AUTH_KEY = "endercompute-key"
             function set_auth_key(key) {

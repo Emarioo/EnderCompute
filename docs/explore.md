@@ -27,6 +27,8 @@ To run a test you need:
 
 A script template is a script that the backend will execute. It is a template because many jobs can use the same templates. You don't want to write the same script for every job.
 
+You can also specify arguments such as which specifc test case to use or which branch to use. These are set through environment variables when scripts runs.
+
 ## Backend details
 There is the web server and the job system. The web server authenticates the HTTP requests and calls the corresponding API method of the job system based on the url (path and queries).
 

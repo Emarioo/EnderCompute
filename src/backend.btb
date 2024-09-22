@@ -44,7 +44,7 @@ struct OutputData {
 
 // One instance per runtime
 struct JobSystem {
-    jobs: Array<Job>;
+    jobs: BucketArray<Job>;
     outputs: Array<OutputData>;
 
     rootdir: StringBuilder; // derived from the directory the job system file was read from, it is not stored in the file itself because you would run into problems if you moved it.
@@ -90,6 +90,12 @@ struct JobSystem {
         job.description.append(desc)
 
         job.created = cast_unsafe<Timestamp>StartMeasure()
+        
+        file: StringBuilder
+        defer file.cleanup()
+        file.append(rootdir)
+        file.append("/endercompute.dat")
+        save_to_file(file)
     }
 
     fn find_job(name: char[]) -> Job* {
@@ -107,6 +113,9 @@ struct JobSystem {
                 return job
         }
         return null
+    }
+    fn filter_jobs() -> Array<Job*> {
+        
     }
 
     fn save_to_file(path: char[]) -> bool {

@@ -5,6 +5,7 @@
 #import "Threads"
 #import "backend"
 #import "HTTP"
+#import "Math"
 
 struct Session {
     server: HTTPServer*;
@@ -15,10 +16,24 @@ struct Session {
     }
 }
 
+global session: Session
+
 fn start_webserver() {
-    port: i32 = 8080
+    // port: i32 = 6666
+    port: i32 = 2000 + (random_f32() * 1000)
     
-    session: Session;
+    #if OS_LINUX
+        err := signal(SIGINT, app_shutdown)
+        if err < 0 {
+            log("signal() failed")
+        }
+        fn @oscall app_shutdown(signum: i32) {
+            log("shutdown")
+            session.server.close()
+        }
+    #endif
+    
+    construct(&session)
     session.job_system = InitJobSystem("data")
     
     session.server = StartHTTPServer(port, handle_event, &session)
@@ -27,6 +42,8 @@ fn start_webserver() {
         session.server.wait()
     }
     
+    return;
+    
     fn handle_event(request: HTTPRequest*, e: Event, user_data: void*) {
         session := cast<Session*>user_data
         server := session.server
@@ -34,8 +51,10 @@ fn start_webserver() {
         path := request.route
         content := request.content
         
+        // log(request)
+        
         if !IsPathSanitized(path) {
-            // log("path is not safe")
+            log("path is not safe")
             return;
         }
         fn empty(s: char[]*) -> char[] {
@@ -43,117 +62,140 @@ fn start_webserver() {
                 return *s
             return {}
         }
+        
+        correct_auth_key := "cat" // TODO: Read key from a file
+        
+        auth_key := request.headers.find("Authorization")
+        is_authorized := false
+        if auth_key {
+            if *auth_key == correct_auth_key {
+                is_authorized = true
+            }
+        }
+        
+        // Anyone can check if the key is correct
         if path == "/api/auth" {
-            auth_key := "cat" // read key from file
-            
-            if content == auth_key {
+            if content == correct_auth_key {
                 server.send(200, {}, e.who)
             } else {
                 server.send(401, {}, e.who) // 401 = Unauthorized
             }
-        } else if path == "/api/create" {
-            fields_loop := split("\n", content)
-            defer fields_loop.cleanup()
-            name: char[]
-            desc: char[]
-            for fields_loop.sliced() {
-                mini_fields := split("=", it)
-                defer mini_fields.cleanup()
-                
-                if mini_fields.size() != 2
-                    continue
-                
-                key := mini_fields[0]
-                val := mini_fields[1]
-                if key == "name"
-                    name = val
-                else if key == "desc"
-                    desc = val
-            }
-            
-            // log("content:\n", content)
-            // log("name:", name)
-            // log("desc:", desc)
-            
-            // TODO: Check if name or desc is empty
-            session.job_system.create_job(name, desc)
-            
-            server.send(200, {}, e.who)
             return;
-        } else if path == "/api/get" {
-            // TODO: check if parse failed
-            
-            str_id := empty(request.queries.find("id"))
-            id: i32 = parse_i64(str_id)
-            
-            job := session.job_system.find_job(id)
-            
-            if !job {
-                server.send(404, {}, e.who)
+        }
+        
+        // If you call any other api then you need to be authorized
+        if substring(path, 0, 5) == "/api/" {
+            if !is_authorized {
+                log("not authorized for ", path)
+                server.send(401, {}, e.who) // 401 = Unauthorized
                 return;
             }
+            log("authorized for ", path)
             
-            data: StringBuilder
-            defer data.cleanup()
-            
-            data.append("{")
-            
-            #macro FIELD(K,V)
-            data.append("\"")
-            data.append(K)
-            data.append("\":")
-            data.append(V)
-            // data.append(",")
-            #endmacro
-            #macro FIELD_S(K,V)
-            data.append("\"")
-            data.append(K)
-            data.append("\":")
-            data.append("\"")
-            data.append(V)
-            data.append("\"")
-            // data.append(",")
-            #endmacro
-            
-                                FIELD_S("name"         , job.name)
-            data.append(",")   FIELD("id"           , job.id)
-            data.append(",") FIELD_S("description"  , job.description)
-            data.append(",")   FIELD("created"      , cast<i64>job.created)
-            data.append(",")   FIELD("started"      , cast<i64>job.started)
-            data.append(",")   FIELD("finished"     , cast<i64>job.finished)
-            data.append(",")   FIELD("output_handle", cast<i32>job.output_handle)
-            
-            data.append("}")
-            
-            server.send(200, data.sliced(), e.who)
-            return;
-        } else  if path == "/api/list" {
-            data: StringBuilder
-            defer data.cleanup()
-            
-            data.append("{")
-            data.append("\"jobs\":[")
-            
-            // get jobs in reverse, last job is shown first in the list
-            for @rev @ptr session.job_system.jobs.sliced() {
-                if nr != 0
-                    data.append(",")
+            if path == "/api/create" {
+                fields_loop := split("\n", content)
+                defer fields_loop.cleanup()
+                name: char[]
+                desc: char[]
+                for fields_loop.sliced() {
+                    mini_fields := split("=", it)
+                    defer mini_fields.cleanup()
+                    
+                    if mini_fields.size() != 2
+                        continue
+                    
+                    key := mini_fields[0]
+                    val := mini_fields[1]
+                    if key == "name"
+                        name = val
+                    else if key == "desc"
+                        desc = val
+                }
+                
+                // log("content:\n", content)
+                // log("name:", name)
+                // log("desc:", desc)
+                
+                // TODO: Check if name or desc is empty
+                session.job_system.create_job(name, desc)
+                
+                server.send(200, {}, e.who)
+                return;
+            } else if path == "/api/get" {
+                // TODO: check if parse failed
+                
+                str_id := empty(request.queries.find("id"))
+                id: i32 = parse_i64(str_id)
+                
+                job := session.job_system.find_job(id)
+                
+                if !job {
+                    server.send(404, {}, e.who)
+                    return;
+                }
+                
+                data: StringBuilder
+                defer data.cleanup()
                 
                 data.append("{")
-                data.append("\"id\":")
-                data.append(it.id)
-                data.append(",")
-                data.append("\"name\":")
+                
+                #macro FIELD(K,V)
                 data.append("\"")
-                data.append(it.name)
+                data.append(K)
+                data.append("\":")
+                data.append(V)
+                // data.append(",")
+                #endmacro
+                #macro FIELD_S(K,V)
                 data.append("\"")
+                data.append(K)
+                data.append("\":")
+                data.append("\"")
+                data.append(V)
+                data.append("\"")
+                // data.append(",")
+                #endmacro
+                
+                                FIELD_S("name"         , job.name)
+                data.append(",")   FIELD("id"           , job.id)
+                data.append(",") FIELD_S("description"  , job.description)
+                data.append(",")   FIELD("created"      , cast<i64>job.created)
+                data.append(",")   FIELD("started"      , cast<i64>job.started)
+                data.append(",")   FIELD("finished"     , cast<i64>job.finished)
+                data.append(",")   FIELD("output_handle", cast<i32>job.output_handle)
+                
                 data.append("}")
+                
+                server.send(200, data.sliced(), e.who)
+                return;
+            } else  if path == "/api/list" {
+                data: StringBuilder
+                defer data.cleanup()
+                
+                data.append("{")
+                data.append("\"jobs\":[")
+                
+                // get jobs in reverse, last job is shown first in the list
+                for @rev @ptr session.job_system.jobs.sliced() {
+                    if nr != 0
+                        data.append(",")
+                    
+                    data.append("{")
+                    data.append("\"id\":")
+                    data.append(it.id)
+                    data.append(",")
+                    data.append("\"name\":")
+                    data.append("\"")
+                    data.append(it.name)
+                    data.append("\"")
+                    data.append("}")
+                }
+                
+                data.append("]}")
+                
+                server.send(200, data.sliced(), e.who)
+                return;
             }
-            
-            data.append("]}")
-            
-            server.send(200, data.sliced(), e.who)
-            return;
         }
         
         real_path: StringBuilder
@@ -166,6 +208,7 @@ fn start_webserver() {
                 real_path.append(path)
             }
         } else {
+            // log("sus")
             server.send(404, {}, e.who)
             return; // suspicious, path in header always begins with slash
         }
@@ -174,6 +217,7 @@ fn start_webserver() {
         filesize: i64
         file := FileOpen(real_path, FILE_READ_ONLY, &filesize)
         if !file {
+            log("bad file ", real_path)
             server.send(404, {}, e.who)
             // log("send: Not Found")
         } else {
@@ -197,7 +241,7 @@ fn start_webserver() {
             }
             
             server.send_built_response(&response, e.who)
-            // log("send: ",real_path)
+            log("sent: ",real_path)
         }
     }
 }
