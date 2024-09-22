@@ -8,6 +8,10 @@
 #import "Linux"
 
 fn main() -> i32 {
+    
+    // log(random_range(0,2))
+    
+    // test_filter_jobs()
 
     // real_path := "public/index.html"
     // buf := Allocate(50)

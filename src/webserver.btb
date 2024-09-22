@@ -36,6 +36,10 @@ fn start_webserver() {
     construct(&session)
     session.job_system = InitJobSystem("data")
     
+    if session.job_system.jobs.getCount() < 6 {
+        create_test_jobs(session.job_system, 20)
+    }
+    
     session.server = StartHTTPServer(port, handle_event, &session)
     if session.server {
         log("Started server at port ",port)
@@ -175,8 +179,10 @@ fn start_webserver() {
                 data.append("{")
                 data.append("\"jobs\":[")
                 
-                // get jobs in reverse, last job is shown first in the list
-                for @rev @ptr session.job_system.jobs.sliced() {
+                filtered_jobs := session.job_system.filter_jobs(SORT_NAME)
+                defer filtered_jobs.cleanup()
+                
+                for filtered_jobs.sliced() {
                     if nr != 0
                         data.append(",")
                     

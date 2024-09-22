@@ -30,6 +30,8 @@ All information gathered should be put into writing.
 
 Then we fix the exploits but that's not part of the assessment itself.
 
+This isn't related to risk assessment but it's important. Rate limits for requests. Not necessary for authorized users altough we could implement it for them too in case key is comprimised. A malicious actor could requests tons of files even if it's just html, js and css. The server should detect this and drop requests. More than 120 requests per minute can be considered suspicious (if they are authorized we can bump it up to 300 since they may be making many small ones).
+
 # Logging
 Useful but not strictly necessary. I mostly want to experiment with creating good logs.
 
