@@ -3,9 +3,9 @@
 */
 
 #import "Logger"
-#import "webserver"
-#import "backend"
-#import "Linux"
+#import "./webserver"
+#import "./backend"
+#import "linux/Linux"
 
 fn main() -> i32 {
     

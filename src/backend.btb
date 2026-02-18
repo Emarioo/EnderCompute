@@ -94,7 +94,7 @@ struct JobSystem {
     }
 
     fn create_job(name: char[], desc: char[]) {
-        idx, job := jobs.add(null)
+        job, index := jobs.add(null)
         
         job.id = next_job_id++
         job.name.append(name)
@@ -112,7 +112,7 @@ struct JobSystem {
     fn find_job(name: char[]) -> Job* {
         iter := jobs.create_iterator()
         while jobs.iterate(&iter) {
-            job := iter.ptr
+            job := iter.value
             if job.name == name
                 return job
         }
@@ -121,7 +121,7 @@ struct JobSystem {
     fn find_job(id: i32) -> Job* {
         iter := jobs.create_iterator()
         while jobs.iterate(&iter) {
-            job := iter.ptr
+            job := iter.value
             if job.id == id
                 return job
         }
@@ -134,7 +134,7 @@ struct JobSystem {
         iter := jobs.create_iterator()
         if sort_type == SORT_REVERSE {
             while jobs.iterate_reverse(&iter) {
-                job := iter.ptr
+                job := iter.value
                 if wildcard_name.len == 0 {
                     arr.add(job)
                 } else {
@@ -145,7 +145,7 @@ struct JobSystem {
             }
         } else {
             while jobs.iterate(&iter) {
-                job := iter.ptr
+                job := iter.value
                 if wildcard_name.len == 0 {
                     arr.add(job)
                 } else {
@@ -213,14 +213,14 @@ struct JobSystem {
 
         iter := jobs.create_iterator()
         while jobs.iterate(&iter) {
-            job := iter.ptr
+            job := iter.value
 
             stream.write(job, JOB_STATIC_SIZE)
 
-            stream.write<u8>(job.name.size())
+            stream.write(cast<i32>job.name.size())
             stream.write(job.name.data(), job.name.size())
 
-            stream.write<u16>(job.description.size())
+            stream.write(cast<u16>job.description.size())
             stream.write(job.description.data(), job.description.size())
         }
 
@@ -229,10 +229,10 @@ struct JobSystem {
         for 0..outputs.size() {
             output := outputs.get_unsafe(nr)
 
-            stream.write<u16>(output.stdout_path.size())
+            stream.write(cast<u8>output.stdout_path.size())
             stream.write(output.stdout_path.data(), output.stdout_path.size())
 
-            stream.write<i32>(output.raw_data.size())
+            stream.write(cast<u16>output.raw_data.size())
             stream.write(output.raw_data.data(), output.raw_data.size())
         }
 
@@ -285,25 +285,20 @@ struct JobSystem {
         read_head: i32 = header.job_offset
 
         for 0..header.job_count {
-            _, job := jobs.add(null)
+            job, _ := jobs.add(null)
 
-            stream.read(read_head, job, JOB_STATIC_SIZE)
-            read_head += JOB_STATIC_SIZE
+            stream.read(&read_head, job, JOB_STATIC_SIZE)
 
             len: u8;
-            stream.read(read_head, &len, sizeof(len))
-            read_head += sizeof(len)
+            stream.read(&read_head, &len, sizeof(len))
             job.name.resize(len)
-            stream.read(read_head, job.name.data(), len)
-            read_head += len
+            stream.read(&read_head, job.name.data(), len)
 
             {
                 len: u16;
-                stream.read(read_head, &len, sizeof(len))
-                read_head += sizeof(len)
+                stream.read(&read_head, &len, sizeof(len))
                 job.description.resize(len)
-                stream.read(read_head, job.description.data(), len)
-                read_head += len
+                stream.read(&read_head, job.description.data(), len)
             }
         }
 
@@ -313,19 +308,15 @@ struct JobSystem {
             output := outputs.get_unsafe(nr)
 
             len: u16;
-            stream.read(read_head, &len, sizeof(len))
-            read_head += sizeof(len)
+            stream.read(&read_head, &len, sizeof(len))
             output.stdout_path.resize(len)
-            stream.read(read_head, output.stdout_path.data(), len)
-            read_head += len
+            stream.read(&read_head, output.stdout_path.data(), len)
 
             {
                 len: u32;
-                stream.read(read_head, &len, sizeof(len))
-                read_head += sizeof(len)
+                stream.read(&read_head, &len, sizeof(len))
                 output.raw_data.resize(len)
-                stream.read(read_head, output.raw_data.data(), len)
-                read_head += len
+                stream.read(&read_head, output.raw_data.data(), len)
             }
         }
 
@@ -380,7 +371,7 @@ struct FileJobSystem_Header {
 fn create_test_jobs(system: JobSystem*, count: i32) {
     // Generated words from https://deepai.org/chat
     // Prompt: Can you create a list of 200 words related to names for a job system in continous integration. Can you format it to fit in a c++ array. Can you also mix in 1/3 normal words like "for", "in", "until".
-    words: Slice<char>[] {
+    words: Slice<char>[.] = {
         "pipeline", "build", "test", "deploy", "merge", "commit", "branch", "repository", "integration", "automation", 
         "configuration", "trigger", "job", "run", "failure", "success", "status", "queue", "workspace", "workflow", 
         "version", "artifact", "release", "environment", "monitor", "dependencies", "script", "code", "execute", "validate", 

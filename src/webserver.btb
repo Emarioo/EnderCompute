@@ -2,10 +2,11 @@
 #import "Net"
 #import "Logger"
 #import "OS"
-#import "Threads"
-#import "backend"
+#import "Thread"
 #import "HTTP"
 #import "Math"
+
+#import "./backend"
 
 struct Session {
     server: HTTPServer*;
@@ -48,7 +49,7 @@ fn start_webserver() {
     
     return;
     
-    fn handle_event(request: HTTPRequest*, e: Event, user_data: void*) {
+    fn handle_event(request: HTTPRequest*, e: NetEvent*, user_data: void*) {
         session := cast<Session*>user_data
         server := session.server
         
