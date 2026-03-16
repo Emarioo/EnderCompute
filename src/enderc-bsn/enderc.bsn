@@ -1,0 +1,23 @@
+/*
+    Public API for Ender Compute
+*/
+
+
+enderc_start :: fn work_dir: string {
+
+    // CREATE session struct
+    //   stores running jobs, logs from old jobs
+    //   job templates to start
+    //   enderc is a CI/CD pipeline
+    //   can build on demand, handle project library dependencies
+    //   tests
+
+    // create web server  (http://enderc.btb-lang.org)
+    //    provide html,js,css files
+    //    js sends api requests to enderc (http://enderc.btb-lang.org/api)
+    //
+    // enderc does not handle https to begin with. personally i will use nginx to handle SSL and won't need https on the web server itself.
+
+    // API endpoint supports
+    //    
+}

@@ -1,0 +1,67 @@
+#!/usr/bin/env basin -run
+
+/*
+    Build script to create release package of Ender Compute
+
+    (release package is just a folder with html,js and enderc binary)
+
+    releases
+        enderc-0.0.1-windows-x86
+            bin
+                enderc
+            lib
+                libenderc.a
+                libenderc.so.0.0
+            include
+                enderc.h
+            public
+                index.html
+*/
+
+// @TODO Specify Basin version this project is compatible with.
+
+
+import "basin" as basin
+import "os"
+
+
+RELEASES_PATH <- "releases"
+VERSION       <- "0.0.1"
+TARGET        <- "windows-x86_64"
+PACKAGE_PATH  <- f"{RELEASES_PATH}/enderc-{VERSION}-{TARGET}"
+EXE_PATH      <- f"{PACKAGE_PATH}/bin/enderc"
+LIB_PATH      <- f"{PACKAGE_PATH}/lib/libenderc.a"
+
+SRC           <- dirname __file__
+
+
+mkdir PACKAGE_PATH
+mkdir dirname(EXE_PATH)
+mkdir dirname(LIB_PATH)
+
+
+options: BasinCompileOptions = [ // See basin.h for options (in repo: https://github.com/emarioo/basin)
+    input_file = f"{SRC}/main.bsn"
+    output_file = EXE_PATH
+]
+basin.compile options
+
+if RELEASE_BUILD! {
+    
+    // @TODO Copy html, includes and other files to package.
+    // @TODO If not release then make symlinks instead. (copy is expensive)
+
+} else {
+
+    basin.compile [
+        input_file = f"{SRC}/main.bsn"
+        output_file = LIB_PATH
+    ]
+    
+    // @TODO If we want to be fancy we can submit two compile tasks and let the basin driver
+    //   compile executable and library at the same time with multiple threads. If compile configuration parameters
+    //   are the same then driver will reuse code compilation for them both.
+    //
+    //   If we compile exe, static lib, and dynamic lib then this will be very good.
+
+}

@@ -7,7 +7,9 @@ Management related
     - Command line interface?
     - Security risk assessment (SRA)
 - Plan version 0.1.0 (maybe this is the prototype)
-- More thorough SRA
+- More thorough SRA (secure risk assessment)
+
+
 
 # Interface
 - Plan the web UI

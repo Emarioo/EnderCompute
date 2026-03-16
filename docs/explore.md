@@ -6,6 +6,24 @@ We'll begin with a prototype. What should it be?
 - A web server where user can interact with jobs.
 - The backend part of the server which runs and manages jobs.
 
+## My specific use case
+I have no idea how normal CI job systems work but I know what I want so I will implement that.
+
+I have the project **BetterThanBatch** where automatic tests and builds would be nice.
+
+I want to:
+- Run `btb --test`
+- Run specific tests
+- Compile mini projects and examples like webserver, linecounter, game. These do not have to run, just making sure they compile is enough. If we just compile then we can compile Windows code on Linux. We just can't link functions. If they have tests then I want to run them.
+- Run examples in docs.
+- Compile different versions and commits, branches.
+
+To do this I want a program with these things:
+- Ability to start tests
+- Interface to see information about runtime, job start date, description, name..
+- The interface should be nice to use, few clicks to do the things you want.
+- If the program is quicker to use and easier to manage than a terminal then it's a win.
+
 ## Design
 The web interface will have these things:
 - Feature to create, edit, and remove jobs.

@@ -3,13 +3,15 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**",
-                "D:/OpenSSL-3/include/*"
+                "${workspaceFolder}/include/*",
+                "${workspaceFolder}/src/*"
             ],
             "defines": [
                 "_DEBUG",
                 "UNICODE",
-                "_UNICODE"
+                "_UNICODE",
+                "OS_WINDOWS",
+                "OS_LINUX"
             ],
             "windowsSdkVersion": "10.0.20348.0",
             "compilerPath": "cl.exe",

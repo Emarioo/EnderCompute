@@ -1,20 +1,25 @@
 **Ender Compute** is a project about running long-running processes such as tests in the background.
 
 Current web interface (work in progress)
+
 ![](./docs/img/prototype-0.PNG)
 
-It is inspired by Jenkins.
 
 # The project
-The code is written in BetterThanBatch (https://github.com/Emarioo/BetterThanBatch).
+The backend is written in Basin (https://github.com/Emarioo/basin).
+The frontend is written in HTML, JS, and CSS.
 
-## Getting started
+**UNDER CONSTRUCTION:** Project was written in BTB (https://github.com/Emarioo/BetterThanBatch) and is now being rewritten in Basin.
+I am rewriting because BTB is deprecated in favour of Basin. I was considering using C first but I need a project to test Basin (same reason i chose to use BTB.)
+
+## Getting started (WIP)
 Download a release from github (https://github.com/Emarioo/EnderCompute/releases).
 Or build it yourself.
 
 Then run the executablein a terminal from the folder you downloaded. A web server will start
 and tell you which port to connect to.
 
+**Flags are not up to date!**
 ```
 endercompute --port 8080
 endercompute --rootdir D:/endercompute/test
@@ -24,20 +29,9 @@ The executable will store information that should persist in the rootdir you spe
 
 ## Building
 ```
-btb src/main
+basin src/enderc-bsn/build.bsn
 ```
 
-That's it... Is what I would like to say but you need to download/install OpenSSL. You can run the program without it (no HTTPS) but it wouldn't be secure.
-
-```
-btb src/main -m SKIP_OPENSSL
-```
-
-## Products and software
-The project develops two software products.
-1. A backend for managing and computing jobs.
-2. A frontend UI (web server) for the backend. It allows users to create see jobs.
-3. (maybe) A command line tool when you don't have a web browser (or like terminals more).
 
 # File structure
 Most directories are self explanatory (tests, examples, docs).
@@ -48,6 +42,6 @@ Most directories are self explanatory (tests, examples, docs).
 
 # Questions
 **What's up with the name?**
-- **Ender** - The End in Minecraft, a void far away, can't be reached my normal means
-- **Compute** - Computation, processing
-- **Ender Compute** - Computation on a server endlessly running somewhere
+- **Ender** - Refers to The End/Enderman in Minecraft. A void of scattered islands far away, can't be reached my normal means.
+- **Compute** - Computation, processing.
+- **Ender Compute** - Computation on some arbitrary far away server endlessly running software jobs.

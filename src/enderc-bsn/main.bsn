@@ -1,0 +1,62 @@
+/*
+    Command Line Interface for Ender Compute
+*/
+
+
+#import "logger"
+
+
+VERSION    <- "0.0.1"
+COMMIT     <- "f5ac21a" // @TODO
+BUILD_DATE <- "2026-03-16"
+
+
+main :: fn argc: int, argv: char** -> int {
+
+    if argc <= 1 {
+        print_version()
+        return 0
+    }
+
+    // @TODO Parse arguments
+
+    work_dir: char*
+
+    argi := 0
+    while argi < argc {
+        arg := argv[argi]
+        argi++
+        if arg == "-h" {
+            print_help()
+            return 0
+        } else if arg[0] == "-" {
+            log(f"Unknown option '{arg}'\n")
+            return 1
+        } else {
+            if work_dir {
+                log(f"Work dir already specified, remove '{arg}'\n")
+                return 1
+            }
+            work_dir = arg
+        }
+    }
+
+    enderc_start(work_dir)
+
+    return 0
+
+}
+
+
+
+
+print_help :: fn {
+    log("Usage: enderc [OPTIONS...] <work_dir>\n")
+    log("  enderc basin_jobs\n")
+}
+
+print_version :: fn {
+    log(f"enderc \e[32m{VERSION}\e[0m\n");
+    log(f"commit \e[33m{COMMIT}\e[0m\n");
+    log(f"built  \e[34m{BUILD_DATE}\e[0m\n");
+}
