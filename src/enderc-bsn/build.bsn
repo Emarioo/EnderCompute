@@ -27,12 +27,16 @@ import "os"
 
 RELEASES_PATH <- "releases"
 VERSION       <- "0.0.1"
-TARGET        <- "windows-x86_64"
+TARGET        <- f"{HOST_OS}-{HOST_ARCH}"
 PACKAGE_PATH  <- f"{RELEASES_PATH}/enderc-{VERSION}-{TARGET}"
-EXE_PATH      <- f"{PACKAGE_PATH}/bin/enderc"
-LIB_PATH      <- f"{PACKAGE_PATH}/lib/libenderc.a"
 
-SRC           <- dirname __file__
+EXE_PATH      <- if "windows" in TARGET  f"{PACKAGE_PATH}/bin/enderc.exe"
+                 else                    f"{PACKAGE_PATH}/bin/enderc"
+
+LIB_PATH      <- if "windows" in TARGET  f"{PACKAGE_PATH}/lib/enderc.lib"
+                 else                    f"{PACKAGE_PATH}/lib/libenderc.a"
+
+
 
 
 mkdir PACKAGE_PATH
@@ -40,11 +44,17 @@ mkdir dirname(EXE_PATH)
 mkdir dirname(LIB_PATH)
 
 
+
+SRC           <- dirname __file__
+
 options: BasinCompileOptions = [ // See basin.h for options (in repo: https://github.com/emarioo/basin)
     input_file = f"{SRC}/main.bsn"
     output_file = EXE_PATH
 ]
+
 basin.compile options
+
+
 
 if RELEASE_BUILD! {
     

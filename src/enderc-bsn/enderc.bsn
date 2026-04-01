@@ -2,8 +2,51 @@
     Public API for Ender Compute
 */
 
+import "memory"
+import "thread"
+import "os" as os
+import "file"
 
-enderc_start :: fn work_dir: string {
+JobType :: enum {
+    JOB_SCRIPT,
+    // Dependency job?
+}
+
+Job :: struct {
+    id: u32
+    type: JobType
+    
+    // @TODO union?
+    script_path: string
+}
+
+Session :: struct {
+    running: bool
+    listener_thread: Thread
+
+    wait_on_jobs: Semaphore
+
+    jobs: BucketArray<Job>
+    jobs_lock: Mutex
+
+    next_job_id: u32
+}
+
+
+enderc_start :: fn (work_dir: string) {
+
+    session: Session* = heap_allocate(Session.SIZE)
+
+    @inline memzero :: fn <T> (ptr: T*) { memzero(ptr, T.SIZE) }
+
+    memzero(session)
+    session.work_dir = work_dir
+
+
+    start_web_server(session)
+
+    process_jobs(session)
+
 
     // CREATE session struct
     //   stores running jobs, logs from old jobs
@@ -19,5 +62,137 @@ enderc_start :: fn work_dir: string {
     // enderc does not handle https to begin with. personally i will use nginx to handle SSL and won't need https on the web server itself.
 
     // API endpoint supports
+    //    list running jobs
+    //    list old jobs
+    //    list jobs you can start
+    //    create a job
     //    
 }
+
+
+
+//################################
+//        JOB PROCESSING
+//################################
+
+
+
+process_jobs :: fn (session: Session*) {
+
+    // We need to consider if we want multiple threads to run multiple jobs. In the end we will make a process
+    // for each job. Each process may compile code using multiple threads. If using make then that will create multiple
+    // processes. Because of this: one thread for job processing and multiple threads for web clients is fine?
+    // For measuring performance we would want to run it on a separate computer that implements EnderCompute Job Runner Endpoint.
+    // Our computer with EnderCompute Scheduler will talk to the runners. (scheduler itself may also be a runner). We will not allow
+    // performance jobs on our scheduler computer. performance jobs run on Single Runner Computers that do one job at a time.
+    // We can schedule other jobs there too if no performance jobs are being done. We can schedule multiple if so too. It's just for
+    // performance jobs, only one is allowed to run on that Runner Computer at any one time. Scheduler will start jobs on its own machine
+    // to begin with and if it's under heavy load start some on second computer if available.
+
+    // Ideally the scheduler detects of much CPU usage we are using and schedules based on that. If it's high then there's no point in
+    // scheduling any new jobs. If 4 jobs are running but we're still low CPU then we can start more jobs if we have them.
+
+    while session.running {
+
+        // @TODO Show UI that we are waiting for jobs
+
+        session.wait_on_jobs.wait()
+
+        // @TODO Show UI that we are done waiting for jobs
+
+        // jobs available!
+
+        session.jobs_lock.lock()
+        
+        // @TODO Implement scheduler. Prioritize jobs, dependencies, etc.
+        job := session.jobs.pop()
+
+        session.jobs_lock.unlock()
+
+        // @TODO Show status on the web UI
+
+        process_job(session, job)
+    }
+
+}
+
+
+process_job :: fn (session: Session*, job: Job) {
+
+    job_dir := f"{session.work_dir}/job_{job.id}"
+    res := os.mkdir(job_dir)
+    if !res {
+        // @TODO Send message to web UI, could not create job directory '<job_dir>'.
+    }
+
+    switch job.type {
+        case JOB_SCRIPT:
+
+            // @TODO Prepend python3 or basin if path has .py or .bsn as extension.
+            //    May be needed on Windows, scripts should use shebang on Linux.
+            proc := os.start_process(job.script_path, cwd = job_dir, async = false)
+
+            // @TODO If process runs for a long time then it may print a ton of stuff to the log.
+            //   In this case we should use a pipe for the process and continously write to the log.
+            //   It may be good to do this by default because we need to make a pipe anyway in implementation
+            //   of os.start_process since proc.stdout would need to be a dynamically allocated resizable string.
+            //   With a pipe and continoues read from pipe and write to file we'll be fine.
+            //   In fact, we could pass file handle to process directly (would be best).
+            file := file_open("default.log", FILE_WRITE)
+            file.write(proc.stdout)
+            file.close()
+
+            // @TODO Free proc resources)
+
+        default: INCOMPLETE("Missing job type")
+    }
+
+}
+
+
+//################################
+//        WEB PROCESSING
+//################################
+
+
+
+start_web_server :: fn (session: Session*) {
+
+    // @TODO Provide proper arguments
+    socket()
+    bind()
+    listen()
+
+    session.listener_thread = create_thread(web_server_listener)
+
+    // @TODO What should we pass, just session?
+    start_thread(session.thread, session)
+}
+
+web_server_listener :: fn (arg: void*) {
+    session: Session* = arg
+    
+    while session.running {
+
+        sock := accept()
+        
+        // @TODO keep thread and socket in a list of connected sockets
+        thread := create_thread(web_receiver)
+
+        // @TODO Pass some client specific info struct, and session
+        start_thread(thread, session)
+    }
+}
+
+web_receiver :: fn (arg: void*) {
+    session: Session* = arg
+
+    while socket_is_active {
+        data := recv()
+
+        // @TODO authenticate client, then process data. either request for html/js/css files or EnderCompute API endpoint to start job for example.
+    }
+}
+
+
+

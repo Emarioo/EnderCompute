@@ -20,7 +20,7 @@ main :: fn argc: int, argv: char** -> int {
 
     // @TODO Parse arguments
 
-    work_dir: char*
+    work_dir: char* = "."
 
     argi := 0
     while argi < argc {

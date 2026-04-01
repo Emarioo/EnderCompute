@@ -1,0 +1,23 @@
+
+import "enderc"
+import "fs" as fs
+import "log"
+
+job_basin: Template = [
+    dependencies = [
+        "gcc"
+        "python"
+    ]
+    repo = "github.com/Emarioo/basin"
+    build_command = "./build.py"
+]
+
+
+job_id := enderc_submit(job_basin)
+
+enderc_execute_jobs()
+
+log_path := enderc_get_log(job_id)
+
+text := fs.read_whole_file(log_path)
+print(text)
